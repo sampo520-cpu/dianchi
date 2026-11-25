@@ -1,0 +1,26 @@
+.passport-surface h2 > svg { width: 23px; height: 23px; flex: 0 0 23px; stroke-width: 1.8; }
+.passport-surface .ps-notice { display: block; width: auto; padding: 18px 20px; margin: 18px 0; border-radius: 5px; border: 1px solid; border-left-width: 5px; }
+.passport-surface .ps-notice h3 { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin: 0 0 12px; font-size: 19px; color: inherit; }
+.passport-surface .ps-notice h3 > svg { flex: 0 0 23px; }
+.passport-surface .ps-notice h3 small { font-size: 14px; }
+.passport-surface .ps-notice-danger { color: #7e2026; background: #fff0f0; border-color: #d78d94; border-left-color: #b42332; }
+.passport-surface .ps-notice-caution { color: #694700; background: #fff7df; border-color: #d9b75e; border-left-color: #a66c00; }
+.passport-surface .ps-notice-info { color: #214c70; background: #eef6fd; border-color: #a3c3df; border-left-color: #3374a4; }
+.passport-surface .ps-notice p, .passport-surface .ps-notice li { color: inherit; }
+.passport-surface .ps-notice h3 + div > h3:first-child { font-size: 17px; }
+.passport-surface .ps-regulatory-note { margin: 18px 0; padding: 18px; border: 1px solid #c7d6e2; border-left: 4px solid #497793; background: #f4f8fb; border-radius: 4px; }
+.passport-surface .ps-regulatory-note h3, .passport-surface .ps-source-disclaimer h3 { display: flex; align-items: center; gap: 9px; margin: 0 0 8px; }
+.passport-surface .ps-regulatory-note h3 svg { flex: 0 0 20px; width: 20px; }
+.passport-surface .ps-law-reference { font-weight: 600; color: #294e68; }
+.passport-surface .ps-note-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 14px; color: #455968; margin-top: 14px; }
+.passport-surface .ps-note-meta a, .passport-surface .ps-reference-link a { display: inline-flex; align-items: center; gap: 8px; }
+.passport-surface .ps-rich-block a { color: #155a8f; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.passport-surface .ps-reference-link { padding: 14px 0; border-top: 1px solid #d6e0e8; }
+.passport-surface .ps-reference-link svg { flex: 0 0 18px; }
+.passport-surface .ps-source-disclaimer { display: block; width: auto; margin: 22px 0; padding: 20px; background: #edf1f5; border: 1px solid #c4ced7; border-radius: 5px; color: #3a4b59; }
+.product-note-editor { min-width: 0; border: 1px solid #c7d4df; border-radius: 4px; padding: 16px; margin: 16px 0; }
+.product-note-editor textarea { width: 100%; min-height: 100px; font: inherit; line-height: 1.6; }
+@container (max-width: 480px) {
+  .passport-surface .ps-notice, .passport-surface .ps-regulatory-note { padding: 14px; }
+  .passport-surface .ps-notice h3 { font-size: 18px; }
+}
