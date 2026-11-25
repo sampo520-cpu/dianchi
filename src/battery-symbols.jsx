@@ -42,14 +42,15 @@ export function BatteryMarkingEditor({form,onChange}) {
     onChange({...form,markings:[...all,{id:id('MARK'),key:'custom-'+id('ICON'),category:group.id,nameEn:draft.title.trim(),imageUrl:draft.imageUrl,icon:'file'}]});
     setCustomDrafts(d=>({...d,[group.id]:{title:'',imageUrl:''}}));
   };
-  return <div className="battery-marking-editor"><h2>图标与标识</h2>{symbolGroups.map(group=>{
+  return <div className="battery-marking-editor"><h2>图标与标识</h2><p className="symbol-editor-hint">分区对应扫码页中的展示板块；点击图标选择或取消，已选图标会高亮。</p>{symbolGroups.map(group=>{
     const items=symbolCatalog.filter(s=>s.category===group.id);
     const selectedCustom=all.filter(mark=>symbolCategory(mark)===group.id&&!items.some(item=>item.key===mark.key));
+    const selectedCount=all.filter(mark=>symbolCategory(mark)===group.id).length;
     const draft=customDrafts[group.id]||{title:'',imageUrl:''};
-    return <section className="symbol-editor-group" key={group.id}><h3>{group.zh}</h3>
+    return <details className="symbol-editor-group" key={group.id}><summary><strong>{group.zh}</strong><span>{selectedCount} 个已选</span></summary>
       <div className="symbol-catalog">{items.map(item=>{const selected=all.some(mark=>mark.key===item.key&&symbolCategory(mark)===group.id);return <button type="button" key={item.key} aria-pressed={selected} className={selected?'selected':''} onClick={()=>toggle(item,group)} title={selected?'取消选择':'选择'+item.zh}><BatterySymbol mark={item}/><span>{item.zh}</span></button>;})}</div>
       {selectedCustom.length>0&&<div className="symbol-custom-selected">{selectedCustom.map(mark=><div className="symbol-custom-chip" key={mark.id}><BatterySymbol mark={mark}/><span>{mark.nameEn||'自定义图标'}</span><button type="button" className="text-btn" onClick={()=>remove(mark)}>移除</button></div>)}</div>}
       <div className="symbol-custom-upload"><strong>自定义图标</strong><label className="form-field">标题<input value={draft.title} onChange={e=>setCustomDrafts(d=>({...d,[group.id]:{...draft,title:e.target.value}}))}/></label><label className="form-field">上传图片<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={e=>upload(e,group)}/></label>{draft.imageUrl&&<img className="symbol-custom-preview" src={draft.imageUrl} alt="图标预览"/>}<button type="button" className="outline" disabled={!draft.title.trim()||!draft.imageUrl} onClick={()=>saveCustom(group)}>添加图标</button></div>
-    </section>;
+    </details>;
   })}</div>;
 }

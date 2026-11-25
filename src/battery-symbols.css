@@ -53,3 +53,4 @@
 .product-language-fields summary { cursor:pointer; line-height:1.6; }
 .product-language-fields textarea { width:100%; min-height:100px; font:inherit; line-height:1.7; }
 @container (max-width:480px) { .ps-symbol-grid { grid-template-columns: minmax(0,1fr); } .ps-symbol-item { padding: 14px; } }
+.symbol-editor-hint{margin:5px 0 12px;color:#62748a;font-size:14px;line-height:1.5}.symbol-editor-group{margin-top:10px;padding:0}.symbol-editor-group>summary{display:flex;justify-content:space-between;align-items:center;gap:12px;cursor:pointer;list-style:none;padding:13px 4px;color:#243b52}.symbol-editor-group>summary::-webkit-details-marker{display:none}.symbol-editor-group>summary::after{content:'+';margin-left:8px;color:#52708c}.symbol-editor-group[open]>summary::after{content:'−'}.symbol-editor-group>summary span{margin-left:auto;color:#718198;font-size:13px;font-weight:400}
