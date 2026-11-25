@@ -20,6 +20,7 @@ export default function ProductForm({ db, change, close, done, value }) {
         template: 'generic',
         customFields: [],
         enabledLanguages: ['en'],
+        defaultLanguage: 'en',
         displaySections: [0, 1, 2, 3, 4],
         sectionLabels: {},
         chem: "LFP",
@@ -243,7 +244,7 @@ export default function ProductForm({ db, change, close, done, value }) {
           <div className="section-divider" />
           <h2>扫码页展示设置</h2>
           <p>选择这个产品开放的语言和要显示的资料分区。产品内容值保持录入原文。</p>
-          <fieldset className="product-display-options"><legend>开放语言</legend><div>{Object.entries(passportLanguages).map(([code,name])=><label key={code}><input type="checkbox" checked={(form.enabledLanguages || ['en']).includes(code)} disabled={code==='en'} onChange={e=>F({...form,enabledLanguages:e.target.checked?[...(form.enabledLanguages||['en']),code]:(form.enabledLanguages||['en']).filter(x=>x!==code)})}/>{name}</label>)}</div><small>语言切换只影响界面、参数名称和分区名称，不翻译产品录入内容。</small></fieldset>
+          <fieldset className="product-display-options"><legend>扫码页语言</legend><div>{Object.entries(passportLanguages).map(([code,name])=><label key={code}><input type="checkbox" checked={(form.enabledLanguages || ['en']).includes(code)} disabled={code==='en'} onChange={e=>{const enabledLanguages=e.target.checked?[...(form.enabledLanguages||['en']),code]:(form.enabledLanguages||['en']).filter(x=>x!==code);F({...form,enabledLanguages,defaultLanguage:enabledLanguages.includes(form.defaultLanguage)?form.defaultLanguage:'en'});}}/>{name}</label>)}</div><label className="form-field">默认显示语言<select value={(form.enabledLanguages||['en']).includes(form.defaultLanguage)?form.defaultLanguage:'en'} onChange={e=>F({...form,defaultLanguage:e.target.value})}>{(form.enabledLanguages||['en']).map(code=><option key={code} value={code}>{passportLanguages[code]}</option>)}</select></label><small>扫码后先显示默认语言，访客仍可切换已开放语言。语言只影响界面、参数名和分区名，产品内容保留原文。新批次自动沿用此产品设置。</small></fieldset>
           <div className="product-section-labels"><strong>分区多语言名称</strong>{['Battery identity','Technical specifications','Materials & sustainability','Documents','Lifecycle'].map((key,index)=><details key={key}><summary>{['身份信息','技术参数','材料与可持续信息','文件资料','使用与生命周期'][index]}</summary>{(form.enabledLanguages||['en']).map(code=><label className="form-field" key={code}>{passportLanguages[code]}<input value={form.sectionLabels?.[code]?.[index] ?? passportResources[code]?.translation?.[key] ?? key} onChange={e=>F({...form,sectionLabels:{...form.sectionLabels,[code]:{...form.sectionLabels?.[code],[index]:e.target.value}}})}/></label>)}</details>)}</div>
           <fieldset className="product-display-options"><legend>展示分区</legend><div>{['身份信息','技术参数','材料与可持续信息','文件资料','使用与生命周期'].map((name,index)=><label key={name}><input type="checkbox" checked={(form.displaySections || [0,1,2,3,4]).includes(index)} onChange={e=>F({...form,displaySections:e.target.checked?[...(form.displaySections||[0,1,2,3,4]),index]:(form.displaySections||[0,1,2,3,4]).filter(x=>x!==index)})}/>{name}</label>)}</div><small>字段没有填写内容时不会显示；分区没有可显示内容时自动隐藏。</small></fieldset>
           <h3>客户扩展字段</h3>

@@ -91,12 +91,9 @@ export function PassportSurface({
   const available = (version.model.enabledLanguages || ['en']).filter(code => languages[code]);
   if (!available.includes('en')) available.unshift('en');
   const initial = () => {
-    const requested =
-      new URLSearchParams(location.search).get("lang") ||
-      localStorage.getItem("passport-language") ||
-      navigator.language.split("-")[0];
+    const requested = new URLSearchParams(location.search).get("lang") || version.model.defaultLanguage || 'en';
     const normalized=requested.split('-')[0];
-    return available.includes(normalized) ? normalized : "en";
+    return available.includes(normalized) ? normalized : available.includes('en') ? 'en' : available[0];
   };
   const [chosen, C] = useState(initial),
     [role, R] = useState(view),
@@ -134,7 +131,6 @@ export function PassportSurface({
             value={lang}
             onChange={(e) => {
               C(e.target.value);
-              localStorage.setItem("passport-language", e.target.value);
               const url=new URL(location.href);url.searchParams.set('lang',e.target.value);history.replaceState(history.state,'',url);
             }}
           >

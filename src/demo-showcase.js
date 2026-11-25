@@ -10,15 +10,51 @@ export const demoShowcase = [
   {id:'DEMO-6F22',feature:'一次电池 · 9V 锌锰 · 图文与多语言',marks:['ce','ukca','rohs','reach','eu-battery']},
 ];
 const redundantIds=new Set(['MOD-ESS-240','MOD-EV-082','MOD-LMT-014','GENERAL-SAMPLE-PORTABLE','DEMO-LR03-ALKALINE']);
+const demoLanguageCodes=['en','de','fr','es','it','pt','nl','pl','zh'];
+const demoModelIds=/^(MOD-(ESS-240|EV-082|LMT-014)|FULL-SAMPLE-(ESS|EV|LMT)|GENERAL-SAMPLE-(PORTABLE|SLI|SMALL)|DEMO-LR03-ALKALINE|DEMO-6F22)$/;
+
+function useEnglishDemoValues(db) {
+  const models=db.models.filter(model=>demoModelIds.test(model.id));
+  for(const model of models) {
+    model.name=model.nameEn||model.name;
+    for(const key of ['materials','composition','disassembly','carbon','recycled','diligence'])
+      if(model[key+'En'])model[key]=model[key+'En'];
+    if(model.company) {
+      for(const key of ['name','address','factory','operator'])
+        if(model.company[key+'En'])model.company[key]=model.company[key+'En'];
+    }
+  }
+  const ids=new Set(models.map(model=>model.id));
+  for(const batch of db.productionBatches||[]) {
+    const model=models.find(item=>item.id===batch.modelId);
+    if(model?.company?.factory)batch.factory=model.company.factory;
+  }
+  for(const instance of db.instances.filter(item=>ids.has(item.modelId))) {
+    if(instance.state==='在役')instance.state='In service';
+  }
+  for(const event of db.events||[]) {
+    const instance=db.instances.find(item=>item.id===event.instanceId);
+    if(instance&&ids.has(instance.modelId)&&event.noteEn)event.note=event.noteEn;
+  }
+  for(const document of db.documents||[]) {
+    const model=models.find(item=>item.id===document.target);
+    if(model&&document.nameEn)document.name=document.nameEn;
+  }
+  for(const evidence of db.applicableMaterials||[]) {
+    if(ids.has(evidence.modelId))evidence.name=evidence.nameEn||evidence.name.replace('（虚构示例）',' (fictional sample)');
+  }
+}
 
 // Archive display-only: retain old scan links, user edits and every historical record.
 export function curateDemoShowcase(db) {
-  if(db.demoShowcaseVersion===1)return db;
+  if(db.demoShowcaseVersion>=3)return db;
   const previous=structuredClone(db);
   for(const model of db.models)if(redundantIds.has(model.id))model.demoArchived=true;
   for(const item of demoShowcase) {
     const model=db.models.find(m=>m.id===item.id);
     if(!model)continue;
+    model.enabledLanguages ||= [...demoLanguageCodes];
+    model.defaultLanguage ||= 'en';
     model.demoFeature=item.feature;
     model.markings ||= [];
     for(const key of item.marks) {
@@ -27,8 +63,9 @@ export function curateDemoShowcase(db) {
       model.markings.push({...symbol,descriptionEn:symbol.category==='conformity'?'Demonstration reference only. This entry does not assert approval or applicability to this sample battery.':symbol.descriptionEn});
     }
   }
+  useEnglishDemoValues(db);
   syncSimplePassports(db,previous);
-  db.demoShowcaseVersion=1;
+  db.demoShowcaseVersion=3;
   return db;
 }
 

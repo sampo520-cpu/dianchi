@@ -48,8 +48,9 @@ test('full samples are additive, complete and only inserted once', () => {
   db.models[0].power = 'User maintained power';
   const original = structuredClone(db.models[0]);
   addFullSamples(db);
+  const migratedDemoFields = new Set(['name','company','materials','composition','disassembly','carbon','recycled','diligence']);
   for (const [key, value] of Object.entries(original))
-    if (value !== '' && value != null) assert.deepEqual(db.models[0][key], value);
+    if (value !== '' && value != null && !migratedDemoFields.has(key)) assert.deepEqual(db.models[0][key], value);
   for (const model of db.models) {
     for (const key of ['power', 'efficiency', 'resistance', 'hazardous', 'parts']) assert.ok(model[key]);
   }
@@ -64,4 +65,35 @@ test('full samples are additive, complete and only inserted once', () => {
   const count = db.instances.length;
   addFullSamples(db);
   assert.equal(db.instances.length, count);
+});
+
+test('all featured demo batteries expose nine languages and default to English', () => {
+  const db=addFullSamples(createSeed());
+  const showcase=db.models.filter(model=>!model.demoArchived);
+  assert.ok(showcase.length>=6);
+  for(const model of showcase) {
+    assert.deepEqual(model.enabledLanguages,['en','de','fr','es','it','pt','nl','pl','zh']);
+    assert.equal(model.defaultLanguage,'en');
+  }
+  const before=structuredClone(showcase.map(model=>[model.id,model.enabledLanguages,model.defaultLanguage]));
+  addFullSamples(db);
+  assert.deepEqual(db.models.filter(model=>!model.demoArchived).map(model=>[model.id,model.enabledLanguages,model.defaultLanguage]),before);
+});
+
+test('demo passport values are English while customer products remain untouched', () => {
+  const db=addFullSamples(createSeed());
+  const samples=db.models.filter(model=>!model.demoArchived);
+  for(const model of samples) {
+    assert.equal(model.name,model.nameEn);
+    assert.equal(model.company.name,model.company.nameEn);
+    assert.equal(model.company.factory,model.company.factoryEn);
+    assert.equal(model.company.address,model.company.addressEn);
+    for(const key of ['materials','composition','disassembly','carbon','recycled','diligence'])
+      if(model[key+'En'])assert.equal(model[key],model[key+'En']);
+  }
+  const userModel={id:'CUSTOM-USER',name:'客户中文产品',company:{name:'客户中文企业'}};
+  db.models.push(userModel);
+  addFullSamples(db);
+  assert.equal(userModel.name,'客户中文产品');
+  assert.equal(userModel.company.name,'客户中文企业');
 });
