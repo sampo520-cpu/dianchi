@@ -7,7 +7,7 @@ import ApplicableMaterials from "./applicable-materials";
 import { matchingEvidence, evidenceIssues } from "./field-map";
 import { check, id, log, latest, makePassportId, snapshot } from "./data";
 import { createProduction, saveMaterialVersion } from "./workflow";
-import { downloadQrZip } from "./downloads";
+import ExportSettings from './export-settings.jsx';
 import "./workflow.css";
 import { templates, euScope } from './templates.js';
 import { CustomValues } from './custom-fields';
@@ -55,6 +55,7 @@ export default function Products(ctx) {
   const selectedBatch = db.productionBatches.find((b) => b.id === batchId);
   const activeRule = rule || model?.codeRule;
   const [search, Q] = useState("");
+  const [exportKind,EK]=useState(''),[selectedCodes,SC]=useState([]);
   const [evidenceIds, EI] = useState({});
   const [customValues, CV] = useState({});
   const [productSearch, PS] = useState(db.models.find(m => m.id === dashboardFilter.modelId)?.name || '');
@@ -739,6 +740,7 @@ export default function Products(ctx) {
         </section>
       ) : (
         <>
+          {exportKind&&<ExportSettings db={db} change={change} notify={notify} close={()=>EK('')} modelId={model.id} rows={rows} filtered={filteredCodes} selected={selectedCodes} kind={exportKind} batchId={batchId}/>}
           <div className="filter-row">
             <input placeholder="搜索电池编号、批次或企业序列号" value={codeSearch} onChange={e=>CQS(e.target.value)} />
             <select aria-label="码状态筛选" value={codeStatusFilter} onChange={e=>CSF(e.target.value)}><option>全部</option><option>可访问</option><option>资料待补充</option><option>已作废</option></select>
@@ -748,44 +750,20 @@ export default function Products(ctx) {
             {(codeSearch || codeStatusFilter !== '全部' || codeFrom || codeTo) && <button className="text-btn" onClick={()=>{CQS('');CSF('全部');CF('');CT('')}}>清除筛选</button>}
             <button
               className="outline"
-              onClick={() =>
-                setModal({
-                  type: "codeExport",
-                  codes: db.codeRecords.filter((c) =>
-                    filteredCodes.some((i) => i.id === c.instanceId),
-                  ),
-                })
-              }
+              onClick={() => EK('xlsx')}
             >
               <Download size={15} />
               导出清单（{filteredCodes.length}）
             </button>
             <button
               className="outline"
-              onClick={() =>
-                setModal({
-                  type: "printFilter",
-                  codes: db.codeRecords.filter((c) =>
-                    filteredCodes.some((i) => i.id === c.instanceId),
-                  ),
-                })
-              }
+              onClick={() => EK('pdf')}
             >
               标签 PDF
             </button>
             <button
               className="outline"
-              onClick={async () => {
-                try {
-                  await downloadQrZip(
-                    db,
-                    model.id,
-                    filteredCodes.filter((i) => i.passportId),
-                  );
-                } catch (e) {
-                  notify(e.message);
-                }
-              }}
+              onClick={() => EK('zip')}
             >
               <Download size={15} />
               二维码 ZIP（{filteredCodes.length}）
@@ -805,6 +783,7 @@ export default function Products(ctx) {
                 {filteredCodes.map((i) => (
                   <tr key={i.id}>
                     <td>
+                      <input type="checkbox" aria-label={'选择 '+i.serial} checked={selectedCodes.includes(i.id)} onChange={e=>SC(e.target.checked?[...selectedCodes,i.id]:selectedCodes.filter(k=>k!==i.id))}/>{' '}
                       <button className="text-btn" onClick={() => navigate('/passport/' + encodeURIComponent(i.passportId || i.id))}>
                         {i.serial}
                       </button>

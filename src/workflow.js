@@ -23,6 +23,7 @@ export function ensureWorkflow(db) {
   db.measurements ||= [];
   db.pageDrafts ||= {};
   db.applicableMaterials ||= [];
+  db.readinessPlans ||= [];
   for (const rule of db.rules) rule.labels = completeFieldLabels(rule);
   for (const field of extraFields)
     if (!db.rules.some((r) => r.code === field.code))

@@ -12,6 +12,11 @@ import {
   validateRows,
   syncSimplePassports,
 } from "./workflow.js";
+test("readiness plans initialize in local workspace data", () => {
+  const db=ensureWorkflow(createSeed());
+  assert.deepEqual(db.readinessPlans,[]);
+});
+
 test("company information is isolated per product in published passports", () => {
   const db = ensureWorkflow(createSeed());
   const first = db.models[0],

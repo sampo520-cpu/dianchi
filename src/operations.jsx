@@ -77,13 +77,17 @@ import { CustomValues } from './custom-fields';
 import { templates, euScope } from './templates.js';
 import RegulationGuide from './regulation-guide.jsx';
 import UsageHelp from './usage-help.jsx';
+import PassportScopeTool from './passport-scope.jsx';
+import RegistrationGuide from './registration-guide.jsx';
+import RegistryManual from './registry-manual.jsx';
+import ReadinessTools from './readiness-tools.jsx';
 
 const nav = [
   ["dashboard", "工作台", Activity],
   ["products", "产品与批次", PackageCheck],
   ["batches", "批次与二维码", QrCode],
   ["requests", "访问管理", ShieldCheck],
-  ["insights", "数据与资料", FileText],
+  ["insights", "工具资料", FileText],
   ["settings", "系统设置", Settings2],
 ];
 const today = () =>
@@ -258,7 +262,7 @@ export default function OperationalApp() {
   const current = useRef(null),
     queue = useRef(Promise.resolve()),
     timer = useRef();
-  const tab = route.split("/")[2] || "products";
+  const tab = route.split('?')[0].split("/")[2] || "products";
   const navTab = tab === 'regulations' ? 'insights' : tab;
   useEffect(() => {
     (async () => {
@@ -369,8 +373,10 @@ export default function OperationalApp() {
                 <SearchResults {...ctx} />
               ) : tab === "dashboard" ? (
                 <Dashboard db={db} navigate={navigate} />
+              ) : route.split('?')[0] === '/admin/insights/registry-manual' ? (
+                <RegistryManual navigate={navigate}/>
               ) : ["insights", "regulations"].includes(tab) ? (
-                <InformationCenter key={tab} {...ctx} initialTab={tab === 'regulations' ? '欧盟电池法规' : '数据概览'} />
+                <InformationCenter key={route} {...ctx} initialTab={tab === 'regulations' ? '欧盟电池法规' : location.search.includes('section=registration') ? '登记与合规指引' : '产品准备清单'} />
               ) : tab === "settings" ? (
                 <Rules {...ctx} />
               ) : [
@@ -2438,13 +2444,13 @@ function Requests(ctx) {
   );
 }
 function InformationCenter(ctx) {
-  const [section, S] = useState(ctx.initialTab || '数据概览');
+  const [section, S] = useState(ctx.initialTab || '产品准备清单');
   return <>
-    <PageTitle title="数据与资料" description="汇总业务数据，查阅法规资料和操作记录。">
+    <PageTitle title="工具资料" description="查询电池护照适用范围，查看业务数据和资料。">
       <button className="outline" onClick={() => S('数据管理')}><Database size={16}/>数据管理</button>
     </PageTitle>
-    <div className="tabs" aria-label="数据与资料栏目">{['数据概览','欧盟电池法规','使用帮助','操作记录',...(section === '数据管理' ? ['数据管理'] : [])].map(label => <button key={label} className={section === label ? 'selected' : ''} onClick={() => S(label)}>{label}</button>)}</div>
-    {section === '数据概览' ? <Dashboard db={ctx.db} navigate={ctx.navigate} embedded/> : section === '欧盟电池法规' ? <RegulationGuide navigate={ctx.navigate}/> : section === '使用帮助' ? <UsageHelp db={ctx.db} navigate={ctx.navigate}/> : <Rules key={section} {...ctx} mode={section === '操作记录' ? 'logs' : 'data'}/>}
+    <div className="tabs" aria-label="工具资料栏目">{['产品准备清单','护照适用查询','登记与合规指引','数据概览','欧盟电池法规','使用帮助','操作记录',...(section === '数据管理' ? ['数据管理'] : [])].map(label => <button key={label} className={section === label ? 'selected' : ''} onClick={() => S(label)}>{label}</button>)}</div>
+    {section === '产品准备清单' ? <ReadinessTools db={ctx.db} change={ctx.change} setModal={ctx.setModal} notify={ctx.notify}/> : section === '登记与合规指引' ? <RegistrationGuide navigate={ctx.navigate}/> : section === '护照适用查询' ? <PassportScopeTool db={ctx.db}/> : section === '数据概览' ? <Dashboard db={ctx.db} navigate={ctx.navigate} embedded/> : section === '欧盟电池法规' ? <RegulationGuide navigate={ctx.navigate}/> : section === '使用帮助' ? <UsageHelp db={ctx.db} navigate={ctx.navigate}/> : <Rules key={section} {...ctx} mode={section === '操作记录' ? 'logs' : 'data'}/>}
   </>;
 }
 function FieldRuleEditor({rule,db,change,close}) {
