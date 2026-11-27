@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {translationFields,localizeModel} from './product-translations.js';
+import {approvedTranslationValue,storeTranslation,translationFields,translationStatus,translationValue,localizeModel} from './product-translations.js';
+import {passportFieldCatalog,passportTemplates} from './passport-field-catalog.js';
 import {passportLanguages,passportResources} from './passport-locales.js';
 import {compliancePresets} from './compliance-marks.js';
 import {createInstance} from 'i18next';
@@ -24,6 +25,26 @@ test('localized product content uses stable IDs and preserves numbers and origin
   const model={nameEn:'Battery',capacity:32,safetyEn:'<p>Warning</p>',company:{addressEn:'Address'},markings:[{id:'CE-1',nameEn:'CE',scopeNote:'Scope'}],characteristics:[{id:'TEST-1',name:'Capacity',value:'32',unit:'Ah',condition:'25 C'}],localizedContent:{zh:{nameEn:'电池',safetyEn:'<p>警告</p>','markings.CE-1.scopeNote':'适用说明','characteristics.TEST-1.condition':'25 摄氏度'}}};
   const fields=translationFields(model);assert.ok(fields.some(f=>f.path==='safetyEn'&&f.rich));
   const localized=localizeModel(model,'zh');assert.equal(localized.nameEn,'电池');assert.equal(localized.capacity,32);assert.equal(localized.characteristics[0].value,'32');assert.equal(localized.characteristics[0].condition,'25 摄氏度');assert.equal(localized.markings[0].scopeNote,'适用说明');assert.equal(model.safetyEn,'<p>Warning</p>');assert.equal(localizeModel(model,'fr'),model);
+});
+test('passport template has stable fine-grained fields and separates translatable text from structured data',()=>{
+  assert.ok(passportFieldCatalog.length>=55);
+  assert.ok(passportFieldCatalog.every(field=>passportTemplates.euBattery.fieldIds.includes(field.id)));
+  const model={passportFields:[{id:'annex13.voltageNominal',value:'48'},{id:'annex13.disassemblyRiskWarnings',value:'Avoid short circuits.'}]};
+  const fields=translationFields(model);
+  assert.ok(fields.some(field=>field.path==='passportFields.annex13.disassemblyRiskWarnings'));
+  assert.ok(!fields.some(field=>field.path==='passportFields.annex13.voltageNominal'));
+});
+test('translations retain editable drafts and become stale when their source changes',()=>{
+  const field={path:'safetyEn',label:'Safety warning',source:'Avoid short circuits.'};
+  let model=storeTranslation({safetyEn:field.source},'fr',field,'Éviter les courts-circuits.');
+  assert.equal(translationStatus(model,'fr',field),'待审核');
+  assert.equal(translationValue(model,'fr',field.path),'Éviter les courts-circuits.');
+  assert.equal(approvedTranslationValue(model,'fr',field.path),'');
+  model=storeTranslation(model,'fr',field,'Éviter les courts-circuits.','已审核');
+  assert.equal(approvedTranslationValue(model,'fr',field.path),'Éviter les courts-circuits.');
+  model={...model,safetyEn:'Keep away from fire.'};
+  assert.equal(translationStatus(model,'fr',{...field,source:model.safetyEn}),'需更新');
+  assert.equal(localizeModel(model,'fr').safetyEn,'Keep away from fire.');
 });
 test('regulation records do not invent certification marks and battery exclusions are explicit',()=>{
   for(const key of ['reach','rohs','eu-battery']){const record=compliancePresets.find(p=>p.key===key);assert.equal(record.kind,'regulation');assert.equal(record.imageUrl,undefined);assert.match(record.sourceUrl,/^https:/);}

@@ -9,6 +9,7 @@ export default function BatchMetadata({ db, change, batchId, close }) {
     [reason, R] = useState("");
   const model = db.models.find(m => m.id === batch.modelId);
   const [customValues, CV] = useState(batch.customValues || {});
+  const [quantity, Q] = useState(batch.count);
   const count = db.instances.filter(
     (i) => i.productionBatchId === batchId,
   ).length;
@@ -23,6 +24,8 @@ export default function BatchMetadata({ db, change, batchId, close }) {
             if (
               await change((d) => {
                 const b = d.productionBatches.find((b) => b.id === batchId);
+                if (!Number.isSafeInteger(Number(quantity)) || Number(quantity) < Math.max(1,count)) throw Error('生产数量必须为正整数且不能少于已建单体数');
+                b.count = Number(quantity);
                 if (
                   (b.date !== date || b.factory !== factory) &&
                   !reason.trim()
@@ -62,6 +65,10 @@ export default function BatchMetadata({ db, change, batchId, close }) {
               value={date}
               onChange={(e) => D(e.target.value)}
             />
+          </label>
+          <label className="form-field">
+            生产数量（已建单体 {count}）
+            <input type="number" min={Math.max(1,count)} required value={quantity} onChange={e=>Q(e.target.value)}/>
           </label>
           <label className="form-field">
             工厂

@@ -17,6 +17,6 @@ export function PortalSide({ nav, tab, navigate, db, notify, open }) {
     {expanded && <nav>{nav.filter(([key]) => key !== 'dashboard').map(([key,label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => navigate('/admin/' + key)}>{label}{key === 'requests' && db.requests.some(r => r.status === '待处理') && <small>{db.requests.filter(r => r.status === '待处理').length}</small>}</button>)}</nav>}
   </aside>;
 }
-export function PortalCrumb({ label, navigate }) {
-  return <div className="portal-crumb"><span>业务中心</span><ChevronRight size={13}/><button onClick={() => navigate('/admin/products')}><Home size={14}/>首页</button><ChevronRight size={13}/><span>业务中心</span><ChevronRight size={13}/><span>电池溯源码</span><ChevronRight size={13}/><b>{label}</b></div>;
+export function PortalCrumb({ label, navigate, items=[] }) {
+  return <div className="portal-crumb"><span>业务中心</span><ChevronRight size={13}/><button onClick={() => navigate('/admin/products')}><Home size={14}/>首页</button><ChevronRight size={13}/><span>业务中心</span><ChevronRight size={13}/><span>电池溯源码</span><ChevronRight size={13}/>{items.length?<><button onClick={()=>navigate('/admin/insights')}>{label}</button>{items.map((item,index)=><React.Fragment key={index}><ChevronRight size={13}/>{item.path?<button onClick={()=>navigate(item.path)}>{item.label}</button>:<b>{item.label}</b>}</React.Fragment>)}</>:<b>{label}</b>}</div>;
 }

@@ -59,7 +59,7 @@ export default function RegistryManual({navigate}) {
 
   return <div className="registry-manual">
     <div className="manual-toolbar">
-      <button className="outline" onClick={() => navigate('/admin/insights?section=registration')}><ArrowLeft size={17}/>返回登记指引</button>
+      <button className="outline" onClick={() => navigate('/admin/insights?category=regulations')}><ArrowLeft size={17}/>返回法规与登记</button>
       <div><a className="outline" href={manualSource.pdf} download="DPP-Registry-User-Guide-v1.03.pdf"><Download size={17}/>英文原件</a><button className="primary" disabled={printing} onClick={printManual}><Printer size={17}/>{printing?'正在准备打印…':'打印 / 另存 PDF'}</button></div>
     </div>
     <div className="manual-heading"><span><BookOpen size={19}/>中文图文手册</span><h1>DPP Registry 经济运营者用户指南</h1><p>从 EU Login、组织验证到数字产品护照登记</p><div>{manualSource.version}<i/>原版发布 {manualSource.published}<i/>非官方中文译本</div></div>

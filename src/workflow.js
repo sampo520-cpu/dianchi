@@ -16,6 +16,7 @@ import {
 } from "./field-map.js";
 import { batteryCategories } from './templates.js';
 import { completeFieldLabels } from './field-labels.js';
+import {migrateTemplateLibrary} from './template-library.js';
 
 export function ensureWorkflow(db) {
   db.productionBatches ||= [];
@@ -54,6 +55,7 @@ export function ensureWorkflow(db) {
     for (const rule of db.rules) rule.categories = [...new Set([...rule.categories, ...batteryCategories.slice(3)])];
     db.categoryTemplateMigration = 1;
   }
+  migrateTemplateLibrary(db);
   return db;
 }
 
@@ -179,7 +181,10 @@ export function createProduction(db, input) {
   );
   if (evidenceProblems.length) throw Error(evidenceProblems.join("；"));
   if (!input.name.trim()) throw Error("请填写生产批次号");
-  if (db.productionBatches.some((b) => b.name === input.name.trim()))
+  const existingBatch = input.existingBatchId ? db.productionBatches.find(b => b.id === input.existingBatchId && b.modelId === model.id) : null;
+  if (input.existingBatchId && !existingBatch) throw Error('追加的生产批次不存在');
+  if (existingBatch && (existingBatch.name !== input.name.trim() || existingBatch.date !== input.date || existingBatch.factory !== input.factory)) throw Error('追加单体时请沿用原批次信息');
+  if (!existingBatch && db.productionBatches.some((b) => b.name === input.name.trim()))
     throw Error("生产批次号重复");
   const chosenRule = { ...model.codeRule, ...input.rule };
   if (
@@ -231,7 +236,8 @@ export function createProduction(db, input) {
     passportIds.some((pid) => db.codeRecords.some((c) => c.passportId === pid))
   )
     throw Error("电池编号或历史链接冲突");
-  const batchId = id("PROD"),
+  if (existingBatch && db.instances.filter(i => i.productionBatchId === existingBatch.id).length + rows.length > existingBatch.count) throw Error('追加后单体数超过生产数量，请先编辑批次生产数量');
+  const batchId = existingBatch?.id || id("PROD"),
     codeBatchId = id("BATCH"),
     now = new Date().toISOString();
   const batch = {
@@ -263,7 +269,7 @@ export function createProduction(db, input) {
     ),
     createdAt: now,
   };
-  db.productionBatches.push(batch);
+  if (!existingBatch) db.productionBatches.push(batch);
   db.codeBatches.push({
     id: codeBatchId,
     productionBatchId: batchId,
@@ -313,8 +319,8 @@ export function createProduction(db, input) {
     Number(model.codeRule.nextSequence) || 1,
     end + 1,
   );
-  log(db, "创建生产批次并自动分码", batch.name + " · " + rows.length + " 块");
-  return batch;
+  log(db, existingBatch ? '向已有批次追加单体码' : "创建生产批次并自动分码", batch.name + " · " + rows.length + " 块");
+  return existingBatch || batch;
 }
 export function effectiveDb(db, instance) {
   const version = db.materialVersions?.find(

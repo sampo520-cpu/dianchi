@@ -61,6 +61,7 @@ import {
 import { fieldDataTypes, inferFieldDataType } from './field-types.js';
 import { passportLanguages } from './passport-locales.js';
 import "./operations.css";
+import './admin-login.css';
 import "./codes.css";
 import Workflow from "./workflow-ui";
 import Products from "./products";
@@ -75,17 +76,20 @@ import './portal-shell.css';
 import { addAccessSamples } from './access.js';
 import { CustomValues } from './custom-fields';
 import { templates, euScope } from './templates.js';
+import {passportFieldCatalog,passportTemplates} from './passport-field-catalog.js';
 import RegulationGuide from './regulation-guide.jsx';
 import UsageHelp from './usage-help.jsx';
 import PassportScopeTool from './passport-scope.jsx';
 import RegistrationGuide from './registration-guide.jsx';
+import {SharedCodeManager, SharedInformation, SharedCodeDetail} from './shared-codes.jsx';
 import RegistryManual from './registry-manual.jsx';
 import ReadinessTools from './readiness-tools.jsx';
+import TemplateSettings from './template-settings.jsx';
 
 const nav = [
   ["dashboard", "工作台", Activity],
-  ["products", "产品与批次", PackageCheck],
-  ["batches", "批次与二维码", QrCode],
+  ["products", "产品资料", PackageCheck],
+  ["batches", "二维码管理", QrCode],
   ["requests", "访问管理", ShieldCheck],
   ["insights", "工具资料", FileText],
   ["settings", "系统设置", Settings2],
@@ -251,6 +255,7 @@ function Dashboard({ db, navigate, embedded = false }) {
 }
 
 export default function OperationalApp() {
+  const [authenticated,AUTH]=useState(()=>sessionStorage.getItem('battery-admin-session')==='active');
   const [db, setDb] = useState(null),
     [fatal, setFatal] = useState(""),
     [saving, setSaving] = useState(false),
@@ -263,7 +268,7 @@ export default function OperationalApp() {
     queue = useRef(Promise.resolve()),
     timer = useRef();
   const tab = route.split('?')[0].split("/")[2] || "products";
-  const navTab = tab === 'regulations' ? 'insights' : tab;
+  const navTab = tab === 'regulations' ? 'insights' : tab === 'shared-codes' ? 'batches' : tab;
   useEffect(() => {
     (async () => {
       try {
@@ -282,7 +287,7 @@ export default function OperationalApp() {
       }
     })();
     const fn = () => {
-      setRoute(location.pathname);
+      setRoute(location.pathname + location.search);
       setQuery("");
     };
     window.addEventListener("popstate", fn);
@@ -342,9 +347,12 @@ export default function OperationalApp() {
   const publicId = route.startsWith("/passport/")
     ? decodeURIComponent(route.split("/")[2] || "")
     : null;
+  if(!publicId&&!route.startsWith('/information/')&&!authenticated)return <AdminLogin onLogin={()=>{sessionStorage.setItem('battery-admin-session','active');AUTH(true)}}/>;
   return (
     <>
-      {publicId ? (
+      {route.startsWith('/information/') ? (
+        <SharedInformation {...ctx} codeType={route.split('/')[2]} codeId={decodeURIComponent(route.split('/')[3]||'')}/>
+      ) : publicId ? (
         <PublicPassport {...ctx} passportId={publicId} />
       ) : (
         <div className="app portal-app">
@@ -366,17 +374,19 @@ export default function OperationalApp() {
               >
                 <Menu size={21} />
               </button>
-              <PortalCrumb label={nav.find(n => n[0] === navTab)?.[1] || (tab === 'dashboard' ? '工作台' : undefined)} navigate={navigate} />
+              <PortalCrumb label={nav.find(n => n[0] === navTab)?.[1] || (tab === 'dashboard' ? '工作台' : undefined)} navigate={navigate} items={navTab==='insights'?insightBreadcrumb(location):[]} />
             </header>
             <div className="page">
               {query ? (
                 <SearchResults {...ctx} />
+              ) : tab === 'shared-codes' || tab === 'batches' ? (
+                <SharedCodeManager {...ctx}/>
               ) : tab === "dashboard" ? (
                 <Dashboard db={db} navigate={navigate} />
               ) : route.split('?')[0] === '/admin/insights/registry-manual' ? (
                 <RegistryManual navigate={navigate}/>
               ) : ["insights", "regulations"].includes(tab) ? (
-                <InformationCenter key={route} {...ctx} initialTab={tab === 'regulations' ? '欧盟电池法规' : location.search.includes('section=registration') ? '登记与合规指引' : '产品准备清单'} />
+                <InformationCenter key={route} {...ctx} initialState={legacyHelpState(location.search,tab)} />
               ) : tab === "settings" ? (
                 <Rules {...ctx} />
               ) : [
@@ -457,6 +467,10 @@ export default function OperationalApp() {
       )}
     </>
   );
+}
+function AdminLogin({onLogin}){
+ const [account,A]=useState(''),[password,P]=useState(''),[error,E]=useState('');
+ return <div className="admin-login"><form onSubmit={e=>{e.preventDefault();if(account==='admin'&&password==='dpp'){E('');onLogin()}else E('账号或密码错误')}}><img src="/portal-logo.png" alt="数字门户"/><h1>后台管理登录</h1><label>账号<input required autoComplete="username" value={account} onChange={e=>A(e.target.value)}/></label><label>密码<input required type="password" autoComplete="current-password" value={password} onChange={e=>P(e.target.value)}/></label>{error&&<p role="alert">{error}</p>}<button className="primary" type="submit">登录</button></form></div>;
 }
 
 function SearchResults(ctx) {
@@ -2443,18 +2457,20 @@ function Requests(ctx) {
     </>
   );
 }
+const helpCategories={tools:'工具查询',regulations:'法规与登记',help:'使用帮助',partners:'电池生态伙伴',news:'行业资讯'};
+function insightBreadcrumb(loc){if(loc.pathname.endsWith('/registry-manual'))return [{label:'法规与登记',path:'/admin/insights?category=regulations'},{label:'完整中文登记手册'}];const state=legacyHelpState(loc.search,loc.pathname.split('/')[2]),category=helpCategories[state.category]||'工具查询';return [{label:category,...(state.topic&&!['电池生态伙伴','行业资讯'].includes(state.topic)?{path:'/admin/insights?category='+state.category}:{})},...(state.topic&&!['电池生态伙伴','行业资讯'].includes(state.topic)?[{label:state.topic}]:[])];}
+const topicCategories={'产品准备清单':'tools','护照适用查询':'tools','欧盟电池法规':'regulations','登记与合规指引':'regulations','完整中文登记手册':'regulations','系统使用与建档':'help','码的导出与生产打印':'help','电池生态伙伴':'partners','行业资讯':'news','数据概览':'dashboard','操作记录':'settings','数据管理':'settings'};
+function legacyHelpState(search,tab){const p=new URLSearchParams(search),old=p.get('section'),topic=p.get('topic')||'';if(tab==='regulations')return {category:'regulations',topic:'欧盟电池法规'};if(old==='registration')return {category:'regulations',topic:'登记与合规指引'};if(old==='readiness-roadmap')return {category:'tools',topic:'产品准备清单'};if(old==='data')return {category:'tools',topic:'数据概览'};if(old==='logs')return {category:'tools',topic:'操作记录'};if(old==='help'){const resourceTypes=['检测与符合性','可持续与供应链','欧盟市场与回收','标识、标签与打印','数据与系统对接','翻译与专业咨询'];if(resourceTypes.includes(topic))return {category:'partners',topic:'电池生态伙伴',resourceCategory:topic};if(['法规进展','官方公告','技术资料'].includes(topic))return {category:'news',topic:'行业资讯',updateCategory:topic};const fixedTopic=topic==='支持中心'?'':topic;return {category:topicCategories[fixedTopic]||'tools',topic:fixedTopic};}const category=p.get('category');return {category:helpCategories[category]?category:'tools',topic};}
 function InformationCenter(ctx) {
-  const [section, S] = useState(ctx.initialTab || '产品准备清单');
+  const [section, S] = useState(ctx.initialState?.topic||''),[category,C]=useState(ctx.initialState?.category||'tools');
+  useEffect(()=>{if(section==='数据概览')ctx.navigate('/admin/dashboard');else if(section==='操作记录'||section==='数据管理')ctx.navigate('/admin/settings');},[section]);
   return <>
-    <PageTitle title="工具资料" description="查询电池护照适用范围，查看业务数据和资料。">
-      <button className="outline" onClick={() => S('数据管理')}><Database size={16}/>数据管理</button>
-    </PageTitle>
-    <div className="tabs" aria-label="工具资料栏目">{['产品准备清单','护照适用查询','登记与合规指引','数据概览','欧盟电池法规','使用帮助','操作记录',...(section === '数据管理' ? ['数据管理'] : [])].map(label => <button key={label} className={section === label ? 'selected' : ''} onClick={() => S(label)}>{label}</button>)}</div>
-    {section === '产品准备清单' ? <ReadinessTools db={ctx.db} change={ctx.change} setModal={ctx.setModal} notify={ctx.notify}/> : section === '登记与合规指引' ? <RegistrationGuide navigate={ctx.navigate}/> : section === '护照适用查询' ? <PassportScopeTool db={ctx.db}/> : section === '数据概览' ? <Dashboard db={ctx.db} navigate={ctx.navigate} embedded/> : section === '欧盟电池法规' ? <RegulationGuide navigate={ctx.navigate}/> : section === '使用帮助' ? <UsageHelp db={ctx.db} navigate={ctx.navigate}/> : <Rules key={section} {...ctx} mode={section === '操作记录' ? 'logs' : 'data'}/>}
+    <UsageHelp db={ctx.db} change={ctx.change} setModal={ctx.setModal} notify={ctx.notify} navigate={ctx.navigate} initialSection={category} initialTopic={section} initialResourceCategory={ctx.initialState?.resourceCategory} initialUpdateCategory={ctx.initialState?.updateCategory} onCategoryChange={C} onTopicChange={S}/>
   </>;
 }
 function FieldRuleEditor({rule,db,change,close}) {
   const [dataType,T]=useState(rule.dataType||inferFieldDataType(rule.code,rule.unit));
+  const [translatable,TR]=useState(!!rule.translatable);
   const [labelDrafts,LD]=useState({...rule.labels});
   const defaultType=inferFieldDataType(rule.code,rule.unit);
   const save=async()=>{
@@ -2462,6 +2478,7 @@ function FieldRuleEditor({rule,db,change,close}) {
       const current=d.rules.find(r=>r.code===rule.code);
       if(!current) throw new Error('字段规则不存在');
       current.dataType=dataType;
+      current.translatable=translatable;
       current.labels={...labelDrafts};
       log(d,'修改字段定义',`${current.zh} · ${dataType}`);
     },'字段类型已保存');
@@ -2472,16 +2489,27 @@ function FieldRuleEditor({rule,db,change,close}) {
     <div className="field-rule-editor">
       <div className="field-rule-fixed"><span>所属层级</span><strong>{{company:'产品责任信息',model:'产品资料',instance:'单码资料'}[rule.level]||rule.level}</strong><span>字段编码</span><strong>{rule.code}</strong></div>
       <label className="form-field">数据类型<select value={dataType} onChange={e=>T(e.target.value)}>{fieldDataTypes.map(type=><option key={type}>{type}</option>)}</select><small>类型决定产品资料编辑时使用的输入控件；字段值仍由产品资料维护。</small></label>
+      <label className="field-translation-toggle"><input type="checkbox" checked={translatable} onChange={e=>TR(e.target.checked)}/><span><strong>产品内容需要翻译</strong><small>开启后，产品编辑页会将此字段加入目标语言译稿清单。数字、单位、编号等结构化值通常不需要开启。</small></span></label>
       <div className="field-label-list"><strong>多语言参数名称</strong><small>扫码页切换语言时按此处对应名称显示；字段值仍使用产品资料中的原始内容。</small>{Object.entries(passportLanguages).map(([code,name])=><label className="form-field" key={code}>{name}<input value={labelDrafts[code] || ''} onChange={e=>LD({...labelDrafts,[code]:e.target.value})}/></label>)}</div>
     </div>
     <div className="modal-foot"><button className="outline" onClick={restore}>恢复默认类型</button><button className="outline" onClick={close}>取消</button><button className="primary" onClick={save}>保存设置</button></div>
   </Modal>;
 }
 
+function PassportTemplateSettings({db,change}) {
+  const [query,Q]=useState('');
+  const overrides=db.passportFieldOverrides||{};
+  const fields=passportFieldCatalog.filter(field=>(field.label+field.source+field.id).toLowerCase().includes(query.toLowerCase()));
+  const setTranslatable=async(field,checked)=>change(d=>{d.passportFieldOverrides||={};d.passportFieldOverrides[field.id]={...d.passportFieldOverrides[field.id],translatable:checked};},'翻译设置已保存');
+  return <><div className="inline-note field-rule-note"><Languages size={15}/><span><strong>{passportTemplates.euBattery.name}</strong> · v{passportTemplates.euBattery.version} · {passportFieldCatalog.length} 个细分数据点。模板按法规目录整理，最终适用性需按电池类别及生效条件复核。</span></div><div className="filter-row"><input className="search large" aria-label="查找护照字段" placeholder="查找字段、编码或法规出处" value={query} onChange={e=>Q(e.target.value)}/></div><section className="panel table-panel"><table><thead><tr><th>字段 / 编码</th><th>数据类型</th><th>法规出处</th><th>内容翻译</th></tr></thead><tbody>{fields.map(field=><tr key={field.id}><td><strong>{field.label}</strong><small>{field.id}</small></td><td>{field.dataType}{field.unit&&` · ${field.unit}`}</td><td>{field.source}</td><td><label className="template-translate-toggle"><input type="checkbox" checked={overrides[field.id]?.translatable??field.translatable} onChange={e=>setTranslatable(field,e.target.checked)}/>{(overrides[field.id]?.translatable??field.translatable)?'需要翻译':'不翻译字段值'}</label></td></tr>)}</tbody></table></section></>;
+}
+
 function Rules(ctx) {
+  if (!ctx.mode || ctx.mode === 'fields') return <><PageTitle title="字段与模板" description="维护共享字段，组合不同场景的产品资料模板。"/><TemplateSettings {...ctx}/></>;
   const { db, change, notify, setModal } = ctx;
   const mode = ctx.mode || 'fields';
-  const tab = mode === 'logs' ? '操作日志' : mode === 'data' ? '数据管理' : '字段规则';
+  const [settingsTab,ST]=useState('字段规则');
+  const tab = mode === 'logs' ? '操作日志' : mode === 'data' ? '数据管理' : settingsTab;
   const fileRef = useRef();
   async function importFile(e) {
     const f = e.target.files?.[0];
@@ -2535,9 +2563,10 @@ function Rules(ctx) {
           <button className="outline" onClick={() => setModal({ type: 'resolver' })}>设置解析域名</button>
           <p className="muted">默认编号规则：进入“产品与批次”，选择产品后设置。查码、导出及打印：进入“批次与二维码”。</p>
         </section>
-      ) : tab === "字段规则" ? (
+      ) : mode === 'fields' ? (
         <>
-          <div className="inline-note field-rule-note">
+        <div className="settings-tabs" role="tablist"><button role="tab" aria-selected={tab==='字段规则'} className={tab==='字段规则'?'active':''} onClick={()=>ST('字段规则')}>通用字段设置</button><button role="tab" aria-selected={tab==='护照模板'} className={tab==='护照模板'?'active':''} onClick={()=>ST('护照模板')}>欧盟护照模板</button></div>
+        {tab==='字段规则'&&<><div className="inline-note field-rule-note">
             <AlertTriangle size={15} />
             <span><strong>字段设置</strong>：这里只配置文本、数值、日期等通用数据类型，控制录入时的输入方式。字段名称、编码和层级固定；产品资料及图文内容仍在产品中维护。本栏目不选择电池类别，也不判断法规适用性。</span>
           </div>
@@ -2561,13 +2590,15 @@ function Rules(ctx) {
                     </td>
                     <td>{r.unit || "—"}</td>
                     <td>{{ company: '产品责任信息', model: '产品资料', instance: '单码资料' }[r.level] || r.level}</td>
-                    <td><span className="rule-badge">{r.dataType||inferFieldDataType(r.code,r.unit)}</span><small className="field-label-locales">{Object.entries(r.labels||{}).filter(([,label])=>String(label||'').trim()).length} 种语言</small></td>
+                    <td><span className="rule-badge">{r.dataType||inferFieldDataType(r.code,r.unit)}</span><small className="field-label-locales">{r.translatable?'内容需翻译 · ':''}{Object.entries(r.labels||{}).filter(([,label])=>String(label||'').trim()).length} 种语言</small></td>
                     <td><button className="small-action" onClick={() => setModal({type:'fieldRule',rule:r})}>编辑</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </section>
+        </>}
+        {mode==='fields'&&tab==='护照模板'&&<PassportTemplateSettings db={db} change={change}/>}
         </>
       ) : tab === "操作日志" ? (
         <section className="panel table-panel">
@@ -2615,6 +2646,7 @@ function Rules(ctx) {
 function RenderModal(ctx) {
   const { modal, setModal, db, change, notify, navigate } = ctx,
     close = () => setModal(null);
+  if (modal.type === 'sharedCodeDetail') return <SharedCodeDetail {...ctx} codeId={modal.codeId} close={close}/>;
   if (modal.type === "batchMetadata")
     return <BatchMetadata {...ctx} batchId={modal.batchId} close={close} />;
   if (modal.type === "model")

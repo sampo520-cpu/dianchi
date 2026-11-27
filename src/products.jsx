@@ -8,6 +8,8 @@ import { matchingEvidence, evidenceIssues } from "./field-map";
 import { check, id, log, latest, makePassportId, snapshot } from "./data";
 import { createProduction, saveMaterialVersion } from "./workflow";
 import ExportSettings from './export-settings.jsx';
+import {SharedCodeButton} from './shared-codes.jsx';
+import {createBatchOnly,sharedVersion,enableSharedCode} from './shared-codes.js';
 import "./workflow.css";
 import { templates, euScope } from './templates.js';
 import { CustomValues } from './custom-fields';
@@ -18,6 +20,8 @@ export default function Products(ctx) {
   ctx={...ctx,db:demoWorkspaceDb(ctx.db)};
   const { db, change, setModal, navigate, notify } = ctx;
   const batchWorkspace = ctx.batchWorkspace;
+  const [batchOnly,BO]=useState(false);
+  const [appendBatch, AB] = useState(null);
   const [dashboardFilter] = useState(() => {
     try { return JSON.parse(sessionStorage.getItem('battery-dashboard-filter') || '{}'); } catch { return {}; }
   });
@@ -34,8 +38,9 @@ export default function Products(ctx) {
     sessionStorage.removeItem("new-batch-product");
     return p;
   });
-  const [product, P] = useState(requestedProduct),
-    [tab, T] = useState(batchWorkspace ? "二维码" : dashboardFilter.status ? "二维码" : "产品资料"),
+  const [entry] = useState(()=>{try{const v=JSON.parse(sessionStorage.getItem('battery-maintain-target')||'null');sessionStorage.removeItem('battery-maintain-target');return v;}catch{return null;}});
+  const [product, P] = useState(entry?.modelId||requestedProduct),
+    [tab, T] = useState(entry?.tab || (batchWorkspace ? "二维码" : dashboardFilter.status ? "二维码" : "产品资料")),
     [create, C] = useState(!!requestedProduct),
     [mode, M] = useState("generate"),
     [count, N] = useState(10),
@@ -46,7 +51,7 @@ export default function Products(ctx) {
   const [batchName, BN] = useState(id("LOT")),
     [factory, F] = useState(db.company.factory || ""),
     [rule, R] = useState(null),
-    [batchId, B] = useState("");
+    [batchId, B] = useState(entry?.batchId||'');
   const model = db.models.find((m) => m.id === product),
     rows = db.instances.filter(
       (i) =>
@@ -113,7 +118,7 @@ export default function Products(ctx) {
             <h1>批次与二维码</h1>
             <p>选择产品，填写本次生产信息，生成后直接下载。</p>
           </div>
-          <div className="title-actions"><button className="outline" onClick={() => ctx.setModal({type:'resolver'})}><QrCode size={16}/>码设置</button><button
+          <div className="title-actions"><button className="outline" onClick={()=>navigate('/admin/shared-codes')}>产品码 / 批次码</button><button className="outline" onClick={() => ctx.setModal({type:'resolver'})}><QrCode size={16}/>码设置</button><button
             className="primary"
             disabled={!db.models.length}
             onClick={() => {
@@ -122,7 +127,7 @@ export default function Products(ctx) {
               T("二维码");
               B("");
               R(null);
-              BN(id("LOT"));
+              AB(null); BO(false); BN(id("LOT"));
             }}
           >
             <Plus size={16} />
@@ -219,6 +224,7 @@ export default function Products(ctx) {
                         >
                           <Pencil size={16} />
                         </button>
+                        <SharedCodeButton ctx={ctx} type="batch" targetId={b.id}/>
                         <button
                           className="text-btn"
                           onClick={() => {
@@ -244,7 +250,7 @@ export default function Products(ctx) {
     return (
       <>
         <div className="page-title">
-          <h1>产品与批次</h1>
+          <h1>产品资料</h1>
           <button
             className="primary"
             onClick={() => {
@@ -299,6 +305,7 @@ export default function Products(ctx) {
                   </td>
                   <td>
                     <div className="row-actions">
+                      <SharedCodeButton ctx={ctx} type="product" targetId={m.id}/>
                       <button
                         title="查看产品信息"
                         onClick={() => {
@@ -411,6 +418,7 @@ export default function Products(ctx) {
           <button
             className="primary"
             onClick={() => {
+              AB(null); BO(false);
               BN(id("LOT"));
               R(null);
               C(true);
@@ -498,10 +506,10 @@ export default function Products(ctx) {
         <>
           <div className="pe-scope">
             {tab === "产品预览"
-              ? "产品层级 · 固定资料来自当前产品，日期与编号为示例占位"
+              ? "产品层级 · 展示产品固定资料"
               : single
                 ? "单码层级 · 当前电池真实数据"
-                : "批次层级 · 固定信息来自产品，生产信息来自本批次；编号展示该批次首块电池"}
+                : "批次层级 · 展示产品固定资料与本批次生产信息"}
             <button
               className="outline"
               onClick={() =>
@@ -527,7 +535,7 @@ export default function Products(ctx) {
           </div>
           <div className="pe-preview">
             <PassportSurface
-              version={snapshot(
+              version={!single ? sharedVersion(db,{id:'PREVIEW',type:tab==='产品预览'?'product':'batch',modelId:model.id,targetId:tab==='产品预览'?model.id:selectedBatch?.id}) : snapshot(
                 {
                   ...db,
                   resolvedProductionBatch:
@@ -603,7 +611,7 @@ export default function Products(ctx) {
               <tr>
                 <th>批次号</th>
                 <th>生产日期 / 工厂</th>
-                <th>码数量</th>
+                <th>生产数量 / 已建单体</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -628,13 +636,15 @@ export default function Products(ctx) {
                       <small>{b.factory}</small>
                     </td>
                     <td>
-                      {
+                      {b.count} / {
                         db.instances.filter((i) => i.productionBatchId === b.id)
                           .length
                       }
                     </td>
                     <td>
                       <div className="row-actions">
+                        <SharedCodeButton ctx={ctx} type="batch" targetId={b.id}/>
+                        <button className="text-btn" onClick={()=>{AB(b);BO(false);BN(b.name);D(b.date);F(b.factory);CV(b.customValues||{});R(null);N(Math.max(1,Math.min(10,b.count-db.instances.filter(i=>i.productionBatchId===b.id).length)));C(true)}}>追加单体码</button>
                         <button
                           title="查看批次信息"
                           onClick={() => {
@@ -827,7 +837,7 @@ export default function Products(ctx) {
         <div className="modal-backdrop">
           <section className="modal wide" role="dialog" aria-label="生成二维码">
             <div className="modal-head">
-              <h2>新建生码批次</h2>
+              <h2>{appendBatch?'向已有批次追加单体码':'新建生产批次'}</h2>
               <button
                 aria-label="关闭"
                 onClick={() => {
@@ -842,6 +852,7 @@ export default function Products(ctx) {
               <label className="form-field">
                 选择产品
                 <select
+                  disabled={!!appendBatch}
                   value={product}
                   onChange={(e) => {
                     P(e.target.value);
@@ -857,11 +868,11 @@ export default function Products(ctx) {
               </label>
               <label className="form-field">
                 批次号
-                <input value={batchName} onChange={(e) => BN(e.target.value)} />
+                <input disabled={!!appendBatch} value={batchName} onChange={(e) => BN(e.target.value)} />
               </label>
               <label className="form-field">
                 工厂
-                <input value={factory} onChange={(e) => F(e.target.value)} />
+                <input disabled={!!appendBatch} value={factory} onChange={(e) => F(e.target.value)} />
               </label>
             </div>
             <p>
@@ -869,10 +880,12 @@ export default function Products(ctx) {
               {(model.company || db.company).name}
             </p>
             <p>{templates[model.template || 'eu']} · {euScope(model)}</p>
+            {!appendBatch&&<label className="confirm-check"><input type="checkbox" checked={batchOnly} onChange={e=>BO(e.target.checked)}/>仅创建生产批次并生成批次码（不创建单体记录）</label>}
+            {appendBatch&&<p>生产数量 {appendBatch.count}，已建单体 {db.instances.filter(i=>i.productionBatchId===appendBatch.id).length}；追加保留原批次及批次码。</p>}
             <CustomValues definitions={model.customFields} level="batch" values={customValues} onChange={CV} />
-            <CustomValues definitions={model.customFields} level="instance" values={customValues} onChange={CV} />
+            {!batchOnly&&<CustomValues definitions={model.customFields} level="instance" values={customValues} onChange={CV} />}
             {(model.customFields || []).some(f => f.level === 'instance') && <p>本次单码字段作为共同初始值，生成后可逐码修改。</p>}
-            <div className="tabs">
+            {!batchOnly&&<div className="tabs">
               <button
                 className={mode === "generate" ? "selected" : ""}
                 onClick={() => M("generate")}
@@ -885,16 +898,17 @@ export default function Products(ctx) {
               >
                 导入已有编号
               </button>
-            </div>
+            </div>}
             <label className="form-field">
               生产日期
               <input
                 type="date"
+                disabled={!!appendBatch}
                 value={date}
                 onChange={(e) => D(e.target.value)}
               />
             </label>
-            {mode === "generate" ? (
+            {batchOnly ? <label className="form-field">生产数量<input type="number" min="1" value={count} onChange={e=>N(e.target.value)}/></label> : mode === "generate" ? (
               <>
                 <div className="form-grid">
                   <label className="form-field">
@@ -1106,10 +1120,11 @@ export default function Products(ctx) {
               </button>
               <button
                 className="primary"
-                disabled={mode === "import" && (!preview.length || duplicate)}
+                disabled={!batchOnly&&mode === "import" && (!preview.length || duplicate)}
                 onClick={async () => {
                   let createdBatch;
                   const ok = await change((d) => {
+                    if(batchOnly){createdBatch=createBatchOnly(d,{modelId:model.id,name:batchName,date,factory,count,customValues});return;}
                     const material = saveMaterialVersion(d, model.id);
                     const generationModel = {
                       ...d.models.find((m) => m.id === model.id),
@@ -1148,6 +1163,7 @@ export default function Products(ctx) {
                     if (issues.length)
                       throw Error("请先补充产品资料：" + issues.join("、"));
                     createdBatch = createProduction(d, {
+                      existingBatchId: appendBatch?.id,
                       customValues,
                       evidenceIds,
                       name: batchName,
@@ -1162,16 +1178,17 @@ export default function Products(ctx) {
                       rows: preview,
                     });
                     log(d, "生成产品二维码", model.name);
+                    if (!appendBatch) enableSharedCode(d,'batch',createdBatch.id);
                   }, "二维码已生成，可直接下载");
                   if (ok) {
                     B(createdBatch.id);
                     C(false);
-                    T("二维码");
+                    if(batchOnly)navigate('/admin/shared-codes?type=batch');else T("二维码");
                     X("");
                   }
                 }}
               >
-                确认生成 {mode === "generate" ? count : preview.length} 个
+                {batchOnly?'创建批次并生成批次码':`确认生成 ${mode === "generate" ? count : preview.length} 个单体码`}
               </button>
             </div>
           </section>

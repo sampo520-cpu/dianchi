@@ -15,6 +15,8 @@ import { effectiveDb } from "./workflow";
 import "./page-editor.css";
 import './passport-notices.css';
 import { downloadPassportPdf } from "./downloads";
+import {templateValue,templateSections} from './template-library.js';
+import {approvedTranslationValue} from './product-translations.js';
 
 const languages = passportLanguages;
 const sectionIcons = [Fingerprint, Gauge, Leaf, Files, History];
@@ -116,7 +118,10 @@ export function PassportSurface({
     const configured = db.rules?.find(current => current.code === rule.code) || rule;
     return configured.labels?.[lang] || rule.labels?.[lang] || (lang === 'zh' ? rule.zh : rule.en);
   };
-  const allRules = version.rules;
+  const configuredFields=version.model.templateConfig?.fields;
+  const templateRows=(configuredFields||[]).filter(f=>!f.code&&String(templateValue(version,f)).trim()!=='');
+  const templateDisplayValue=f=>(f.translatable&&approvedTranslationValue(version.model,lang,'passportFields.'+f.id))||templateValue(version,f);
+  const allRules = configuredFields&&!version.model.templateConfig.legacy?version.rules.filter(r=>configuredFields.some(f=>f.id===r.code)):version.rules;
   const rules = allRules.filter(r => r.access !== '受限' && String(value(r)).trim() !== '');
   const restrictedRules = allRules.filter(r => r.access === '受限' && String(value(r)).trim() !== '');
   const restrictedDocuments = version.documents.filter(d => d.access === '受限' && (d.nameEn || d.name));
@@ -140,9 +145,6 @@ export function PassportSurface({
               </option>
             ))}
           </select>}
-          {navigate && (
-            <button onClick={() => navigate("/admin/pages")}>Admin</button>
-          )}
         </div>
       )}
       <header className="ps-identity">
@@ -237,6 +239,7 @@ export function PassportSurface({
           </section>
         );
       })}
+      {[0,1,2,3,4].filter(n=>enabledSections.includes(n)&&templateRows.some(f=>f.section===n&&f.access!=='受限')).map(n=><section className="ps-section" key={'template-'+n}><h2>{version.model.sectionLabels?.[lang]?.[n]||labels[lang][n]}</h2>{templateRows.filter(f=>f.section===n&&f.access!=='受限').map(f=><div className="public-kv" key={f.id}><span translate="no">{f.labels?.[lang]||f.labels?.en||f.label}</span><strong translate="no">{String(templateValue(version,f))}{f.unit?' '+f.unit:''}</strong></div>)}</section>)}
       {enabledSections.includes(2) && (version.model.productOverviewEn?.trim() || version.model.characteristics?.some(r=>[r.name,r.value,r.condition,r.note].some(x=>String(x||'').trim())) || version.model.safetyEn?.trim() || version.model.cautionEn?.trim() || version.model.wasteEn?.trim() || version.model.extinguishingEn?.trim() || version.model.markings?.length) && <section className="ps-product-details">
         {version.model.productOverviewEn && <div className="ps-rich-block"><h2><Battery aria-hidden="true"/>Product overview{adminHints && <small className="ps-zh-label">产品概览</small>}</h2><div dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(version.model.productOverviewEn) }} /></div>}
         {version.model.characteristics?.length > 0 && <div className="ps-rich-block"><h2>Battery characteristics{adminHints && <small className="ps-zh-label">性能测试数据及测试条件</small>}</h2><div className="ps-spec-table-wrap" style={{width:'100%',overflowX:'auto'}}><table className="ps-spec-table" style={{width:'100%',minWidth:560,tableLayout:'fixed',borderCollapse:'collapse'}}><colgroup><col style={{width:'22%'}}/><col style={{width:'22%'}}/><col style={{width:'56%'}}/></colgroup><thead><tr><th style={{padding:12,textAlign:'left',background:'#f5f8fc',borderBottom:'1px solid #e3eaf0'}}>Test item</th><th style={{padding:12,textAlign:'left',background:'#f5f8fc',borderBottom:'1px solid #e3eaf0'}}>Result</th><th style={{padding:12,textAlign:'left',background:'#f5f8fc',borderBottom:'1px solid #e3eaf0'}}>Test conditions</th></tr></thead><tbody>{version.model.characteristics.map(r=><tr key={r.id}><th style={{padding:12,textAlign:'left',verticalAlign:'top',borderBottom:'1px solid #e3eaf0',overflowWrap:'anywhere'}}>{r.name}</th><td style={{padding:12,verticalAlign:'top',borderBottom:'1px solid #e3eaf0',overflowWrap:'anywhere'}}>{r.value} {r.unit}</td><td style={{padding:12,verticalAlign:'top',borderBottom:'1px solid #e3eaf0',overflowWrap:'anywhere'}}>{r.condition}{r.note && <small style={{display:'block',marginTop:5,color:'#75849a'}}>{r.note}</small>}</td></tr>)}</tbody></table></div></div>}
@@ -252,7 +255,7 @@ export function PassportSurface({
           return <div className="public-kv" key={f.id}><span>{f.labels?.[lang] || f.label}{scopeHint(f.level === 'product' ? 'model.custom' : f.level === 'batch' ? 'batch.custom' : 'instance.custom')}</span><strong>{values?.[f.id]}</strong></div>;
         })}
       </section>}
-      {(restrictedRules.length > 0 || restrictedDocuments.length > 0 || version.events.some(e=>String(e.noteEn||e.note||e.description||'').trim())) && <section className="ps-restricted" aria-label="受限资料区">
+      {(restrictedRules.length > 0 || templateRows.some(f=>f.access==='受限') || restrictedDocuments.length > 0 || version.events.some(e=>String(e.noteEn||e.note||e.description||'').trim())) && <section className="ps-restricted" aria-label="受限资料区">
         <h2><LockKeyhole size={19} />Restricted information{adminHints && <small className="ps-zh-label">受限资料区</small>}</h2>
         <p>{authorized ? 'Viewing access' : 'Select a role and an active grant'}</p>
         <div className="ps-access">
@@ -268,6 +271,7 @@ export function PassportSurface({
         <small>Local role preview; authentication is not connected</small>
         {role === '维修回收' && !authorized && <p>Select an active grant for this passport.</p>}
         {authorized && <>
+          {templateRows.filter(f=>f.access==='受限').map(f=><div className="public-kv" key={f.id}><span translate="no">{f.labels?.[lang]||f.labels?.en||f.label}</span><strong translate="no">{String(templateValue(version,f))}{f.unit?' '+f.unit:''}</strong></div>)}
           {restrictedRules.map(r => <div key={r.code} data-field={r.code} className={'public-kv ' + (edit ? 'ps-editable ' : '') + (edit && selectedCode === r.code ? 'ps-selected' : '')} role={edit ? 'button' : undefined} tabIndex={edit ? 0 : undefined} onClick={() => edit && onSelect({ kind: 'field', rule: r })} onKeyDown={e => { if (edit && ['Enter', ' '].includes(e.key)) { e.preventDefault(); onSelect({ kind: 'field', rule: r }); } }}><span>{fieldName(r)}{adminHints && <small className="ps-zh-label">{r.zh}</small>}{scopeHint(r.code)}</span><strong>{String(value(r))}{r.unit ? ' ' + r.unit : ''}</strong></div>)}
           {restrictedDocuments.length > 0 && <h3>Restricted documents{adminHints && <small className="ps-zh-label">受限附件</small>}</h3>}
           {restrictedDocuments.map(d => <div className="public-kv" key={d.id}><span>{d.nameEn || d.name}</span>{d.dataUrl ? <a download={d.name} href={d.dataUrl}>Download</a> : <span>File not supplied</span>}</div>)}
